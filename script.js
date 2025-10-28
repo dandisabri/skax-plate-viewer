@@ -1,59 +1,57 @@
-document.getElementById("loadBtn").addEventListener("click", () => {
-  const fileInput = document.getElementById("fileInput");
+document.getElementById('loadBtn').addEventListener('click', function () {
+  const fileInput = document.getElementById('fileInput');
   const file = fileInput.files[0];
 
   if (!file) {
-    alert("Silakan pilih file CSV terlebih dahulu!");
+    alert('Silakan pilih file CSV terlebih dahulu.');
     return;
   }
 
-  Papa.parse(file, {
-    complete: function (results) {
-      const data = results.data;
-      if (!data || data.length === 0) {
-        alert("File kosong atau tidak terbaca.");
-        return;
-      }
-
-      // Bersihkan baris kosong dari CSV
-      const cleanData = data.filter(row => row.some(cell => cell.trim() !== ""));
-
-      // Pastikan baris pertama berisi header
-      const headers = cleanData[0];
-      const firstCell = headers[0].trim().toUpperCase();
-
-      if (firstCell !== "WELL" && firstCell !== "A" && firstCell !== "1") {
-        alert("File tidak sesuai format microplate (baris harus dimulai dengan Well, A, B, C, dst).");
-        return;
-      }
-
-      renderTable(cleanData);
-    },
-    error: function (err) {
-      alert("Terjadi kesalahan saat membaca file: " + err.message);
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const text = e.target.result;
+    const rows = text.trim().split(/\r?\n/).map(r => r.split(/[,;\t]+/));
+    
+    // Validasi header (harus ada "Well" di kolom pertama)
+    if (!rows[0][0].toLowerCase().includes('well')) {
+      alert('File tidak sesuai format microplate (kolom pertama harus berisi "Well").');
+      return;
     }
-  });
-});
 
-function renderTable(data) {
-  const container = document.getElementById("tableContainer");
-  container.innerHTML = "";
+    // Ambil header
+    const headers = rows[0];
+    const dataRows = rows.slice(1);
 
-  const table = document.createElement("table");
-  const tbody = document.createElement("tbody");
+    // Render tabel
+    const table = document.getElementById('dataTable');
+    table.innerHTML = '';
 
-  data.forEach((row, i) => {
-    const tr = document.createElement("tr");
-
-    row.forEach(cell => {
-      const td = document.createElement(i === 0 ? "th" : "td");
-      td.textContent = cell;
-      tr.appendChild(td);
+    // Buat header tabel
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headers.forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h.trim();
+      headerRow.appendChild(th);
     });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
 
-    tbody.appendChild(tr);
-  });
+    // Buat body tabel
+    const tbody = document.createElement('tbody');
+    dataRows.forEach(row => {
+      if (row.length > 1 && row[0].trim() !== '') {
+        const tr = document.createElement('tr');
+        row.forEach(cell => {
+          const td = document.createElement('td');
+          td.textContent = cell.trim();
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      }
+    });
+    table.appendChild(tbody);
+  };
 
-  table.appendChild(tbody);
-  container.appendChild(table);
-}
+  reader.readAsText(file);
+});
