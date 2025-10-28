@@ -1,117 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SKAX Plate Viewer</title>
   <style>
     body {
       font-family: Arial, sans-serif;
+      background-color: #0d1117;
+      color: #c9d1d9;
       text-align: center;
-      background: #f8f9fa;
-      padding: 30px;
+      padding: 20px;
     }
-    h2 {
-      margin-bottom: 20px;
+    h1 {
+      color: #58a6ff;
+    }
+    input[type="file"] {
+      margin: 10px;
+    }
+    button {
+      background-color: #238636;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+      margin: 10px;
+    }
+    button:hover {
+      background-color: #2ea043;
     }
     table {
-      border-collapse: collapse;
       margin: 20px auto;
-      background: white;
+      border-collapse: collapse;
+      background-color: #161b22;
+      color: #c9d1d9;
     }
-    td, th {
-      border: 1px solid #ccc;
-      padding: 6px 10px;
+    th, td {
+      border: 1px solid #30363d;
+      padding: 8px 12px;
       text-align: center;
-      font-size: 14px;
     }
     th {
-      background: #007bff;
-      color: white;
+      background-color: #21262d;
     }
-    input, button {
-      margin: 10px;
-      padding: 8px 14px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    #tableContainer {
-      margin-top: 20px;
+    td {
+      width: 50px;
+      height: 30px;
     }
   </style>
 </head>
 <body>
-  <h2>SKAX Plate Viewer (96-well)</h2>
+  <h1>SKAX Plate Viewer</h1>
+  <p>Upload your CSV or load an example to view the plate data.</p>
 
-  <input type="file" id="fileInput" accept=".csv,.txt">
-  <button id="loadBtn">Load File</button>
-  <button id="loadExampleBtn">Load Example CSV</button>
+  <input type="file" id="fileInput" accept=".csv" />
+  <button id="loadExample">Load Example CSV</button>
 
-  <div id="tableContainer"></div>
+  <div id="output"></div>
 
   <script>
-    const fileInput = document.getElementById('fileInput');
-    const container = document.getElementById('tableContainer');
-    const loadBtn = document.getElementById('loadBtn');
-    const loadExampleBtn = document.getElementById('loadExampleBtn');
-
-    // Fungsi utama untuk parsing CSV
+    // Fungsi parsing CSV
     function parseCSV(text) {
-      // Bersihkan karakter aneh
-      text = text.replace(/[^\x20-\x7E\n\r.,;0-9A-Za-z]/g, "");
-
-      // Deteksi pemisah otomatis
-      let delimiter = ',';
-      if (text.includes(';')) delimiter = ';';
-      else if (text.includes('\t')) delimiter = '\t';
-
-      const lines = text.trim().split(/\r?\n/);
-      const data = lines.map(line => line.split(delimiter).map(v => v.trim()));
-
-      // Cari baris awal data (biasanya mulai dari A–H)
-      const startIndex = data.findIndex(row => /^[A-H]/.test(row[0] || ''));
-      if (startIndex === -1) {
-        alert('Data plate tidak ditemukan. Pastikan format CSV benar (A–H, 1–12).');
-        return;
-      }
-
-      const plateData = data.slice(startIndex, startIndex + 8);
-      renderTable(plateData);
+      const rows = text.trim().split("\n").map(r => r.split(","));
+      renderTable(rows);
     }
 
-    // Fungsi untuk menampilkan tabel
-    function renderTable(plateData) {
-      let html = "<table><tr><th></th>";
-      for (let i = 1; i <= 12; i++) html += `<th>${i}</th>`;
-      html += "</tr>";
-
-      for (const row of plateData) {
-        html += `<tr><th>${row[0]}</th>`;
-        for (let i = 1; i <= 12; i++) {
-          const val = row[i] || "";
-          html += `<td>${val}</td>`;
-        }
-        html += "</tr>`;
-      }
+    // Fungsi menampilkan tabel
+    function renderTable(rows) {
+      let html = "<table>";
+      rows.forEach((row, i) => {
+        html += "<tr>";
+        row.forEach(cell => {
+          html += i === 0 ? `<th>${cell}</th>` : `<td>${cell}</td>`;
+        });
+        html += "</tr>";
+      });
       html += "</table>";
-
-      container.innerHTML = html;
+      document.getElementById("output").innerHTML = html;
     }
 
-    // Tombol untuk load file pengguna
-    loadBtn.addEventListener('click', () => {
-      const file = fileInput.files[0];
-      if (!file) {
-        alert('Pilih file CSV terlebih dahulu.');
-        return;
-      }
-
+    // Ketika file diupload
+    document.getElementById("fileInput").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
       const reader = new FileReader();
-      reader.onload = (e) => parseCSV(e.target.result);
+      reader.onload = function (event) {
+        parseCSV(event.target.result);
+      };
       reader.readAsText(file);
     });
 
-    // Tombol untuk load contoh CSV tetap
-    loadExampleBtn.addEventListener('click', () => {
+    // Ketika tombol "Load Example" ditekan
+    document.getElementById("loadExample").addEventListener("click", function () {
       const exampleCSV = `Well,1,2,3,4,5,6,7,8,9,10,11,12
 A,0.0467,0.0489,0.0517,0.0509,0.0524,0.0509,0.0506,0.0528,0.0504,0.0511,0.0496,0.0503
 B,0.0509,0.0510,0.0520,0.0524,0.0509,0.0509,0.0509,0.0504,0.0504,0.0504,0.0499,0.0516
@@ -119,9 +101,7 @@ C,0.0507,0.0519,0.0509,0.0509,0.0509,0.0509,0.0509,0.0523,0.0505,0.0507,0.0512,0
 D,0.0510,0.0507,0.0504,0.0509,0.0514,0.0515,0.0511,0.0511,0.0497,0.0499,0.0497,0.0497
 E,0.0541,0.0530,0.0508,0.0498,0.0509,0.0515,0.0515,0.0515,0.0507,0.0500,0.0498,0.0496
 F,0.0510,0.0509,0.0519,0.0508,0.0472,0.0514,0.0515,0.0522,0.0509,0.0509,0.0509,0.0498
-G,0.0512,0.0517,0.0514,0.0511,0.0465,0.0499,0.0492,0.0525,0.0512,0.0509,0.0514,0.0514
-H,0.0505,0.0508,0.0510,0.0509,0.0512,0.0507,0.0511,0.0513,0.0515,0.0510,0.0509,0.0506`;
-
+G,0.0512,0.0517,0.0514,0.0511,0.0465,0.0499,0.0492,0.0525,0.0512,0.0509,0.0514,0.0514`;
       parseCSV(exampleCSV);
     });
   </script>
