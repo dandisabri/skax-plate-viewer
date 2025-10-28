@@ -10,6 +10,9 @@
       background: #f8f9fa;
       padding: 30px;
     }
+    h2 {
+      margin-bottom: 20px;
+    }
     table {
       border-collapse: collapse;
       margin: 20px auto;
@@ -29,64 +32,97 @@
       margin: 10px;
       padding: 8px 14px;
       font-size: 14px;
+      cursor: pointer;
+    }
+    #tableContainer {
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
   <h2>SKAX Plate Viewer (96-well)</h2>
+
   <input type="file" id="fileInput" accept=".csv,.txt">
-  <button id="loadBtn">Load</button>
+  <button id="loadBtn">Load File</button>
+  <button id="loadExampleBtn">Load Example CSV</button>
 
   <div id="tableContainer"></div>
 
   <script>
     const fileInput = document.getElementById('fileInput');
     const container = document.getElementById('tableContainer');
+    const loadBtn = document.getElementById('loadBtn');
+    const loadExampleBtn = document.getElementById('loadExampleBtn');
 
-    document.getElementById('loadBtn').addEventListener('click', () => {
+    // Fungsi utama untuk parsing CSV
+    function parseCSV(text) {
+      // Bersihkan karakter aneh
+      text = text.replace(/[^\x20-\x7E\n\r.,;0-9A-Za-z]/g, "");
+
+      // Deteksi pemisah otomatis
+      let delimiter = ',';
+      if (text.includes(';')) delimiter = ';';
+      else if (text.includes('\t')) delimiter = '\t';
+
+      const lines = text.trim().split(/\r?\n/);
+      const data = lines.map(line => line.split(delimiter).map(v => v.trim()));
+
+      // Cari baris awal data (biasanya mulai dari A–H)
+      const startIndex = data.findIndex(row => /^[A-H]/.test(row[0] || ''));
+      if (startIndex === -1) {
+        alert('Data plate tidak ditemukan. Pastikan format CSV benar (A–H, 1–12).');
+        return;
+      }
+
+      const plateData = data.slice(startIndex, startIndex + 8);
+      renderTable(plateData);
+    }
+
+    // Fungsi untuk menampilkan tabel
+    function renderTable(plateData) {
+      let html = "<table><tr><th></th>";
+      for (let i = 1; i <= 12; i++) html += `<th>${i}</th>`;
+      html += "</tr>";
+
+      for (const row of plateData) {
+        html += `<tr><th>${row[0]}</th>`;
+        for (let i = 1; i <= 12; i++) {
+          const val = row[i] || "";
+          html += `<td>${val}</td>`;
+        }
+        html += "</tr>`;
+      }
+      html += "</table>";
+
+      container.innerHTML = html;
+    }
+
+    // Tombol untuk load file pengguna
+    loadBtn.addEventListener('click', () => {
       const file = fileInput.files[0];
-      if (!file) return alert('Please select a CSV file first.');
+      if (!file) {
+        alert('Pilih file CSV terlebih dahulu.');
+        return;
+      }
 
       const reader = new FileReader();
-      reader.onload = (e) => {
-        let text = e.target.result;
-
-        // Bersihkan karakter aneh dari hasil ekspor .skax
-        text = text.replace(/[^\x20-\x7E\n\r.,;0-9A-Za-z]/g, "");
-
-        // Deteksi pemisah otomatis (koma, titik koma, atau tab)
-        let delimiter = ',';
-        if (text.includes(';')) delimiter = ';';
-        else if (text.includes('\t')) delimiter = '\t';
-
-        const lines = text.trim().split(/\r?\n/);
-        const data = lines.map(line => line.split(delimiter).map(v => v.trim()));
-
-        // Cari area data plate (biasanya dimulai dengan huruf A–H)
-        const startIndex = data.findIndex(row => /^[A-H]/.test(row[0] || ''));
-        if (startIndex === -1) return alert('Plate data not detected.');
-
-        const plateData = data.slice(startIndex, startIndex + 8);
-
-        // Buat tabel
-        let html = "<table><tr><th></th>";
-        for (let i = 1; i <= 12; i++) html += `<th>${i}</th>`;
-        html += "</tr>";
-
-        for (const row of plateData) {
-          html += `<tr><th>${row[0]}</th>`;
-          for (let i = 1; i <= 12; i++) {
-            const val = row[i] || "";
-            html += `<td>${val}</td>`;
-          }
-          html += "</tr>";
-        }
-        html += "</table>";
-
-        container.innerHTML = html;
-      };
-
+      reader.onload = (e) => parseCSV(e.target.result);
       reader.readAsText(file);
+    });
+
+    // Tombol untuk load contoh CSV tetap
+    loadExampleBtn.addEventListener('click', () => {
+      const exampleCSV = `Well,1,2,3,4,5,6,7,8,9,10,11,12
+A,0.0467,0.0489,0.0517,0.0509,0.0524,0.0509,0.0506,0.0528,0.0504,0.0511,0.0496,0.0503
+B,0.0509,0.0510,0.0520,0.0524,0.0509,0.0509,0.0509,0.0504,0.0504,0.0504,0.0499,0.0516
+C,0.0507,0.0519,0.0509,0.0509,0.0509,0.0509,0.0509,0.0523,0.0505,0.0507,0.0512,0.0503
+D,0.0510,0.0507,0.0504,0.0509,0.0514,0.0515,0.0511,0.0511,0.0497,0.0499,0.0497,0.0497
+E,0.0541,0.0530,0.0508,0.0498,0.0509,0.0515,0.0515,0.0515,0.0507,0.0500,0.0498,0.0496
+F,0.0510,0.0509,0.0519,0.0508,0.0472,0.0514,0.0515,0.0522,0.0509,0.0509,0.0509,0.0498
+G,0.0512,0.0517,0.0514,0.0511,0.0465,0.0499,0.0492,0.0525,0.0512,0.0509,0.0514,0.0514
+H,0.0505,0.0508,0.0510,0.0509,0.0512,0.0507,0.0511,0.0513,0.0515,0.0510,0.0509,0.0506`;
+
+      parseCSV(exampleCSV);
     });
   </script>
 </body>
