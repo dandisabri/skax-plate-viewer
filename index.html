@@ -1,22 +1,19 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Microplate Data Viewer</title>
+  <title>Microplate Viewer</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h2>Microplate CSV Viewer</h2>
+  <h2>96-Well Plate Viewer</h2>
 
-  <div class="upload-section">
-    <input type="file" id="fileInput" accept=".csv" />
-    <button id="loadBtn">Load</button>
-  </div>
+  <input type="file" id="fileInput" accept=".csv" />
+  <button id="loadBtn">Load</button>
 
-  <div id="tableContainer"></div>
+  <div id="plateContainer"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
