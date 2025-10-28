@@ -1,9 +1,7 @@
 document.getElementById('loadBtn').addEventListener('click', function () {
-  const fileInput = document.getElementById('fileInput');
-  const file = fileInput.files[0];
-
+  const file = document.getElementById('fileInput').files[0];
   if (!file) {
-    alert('Silakan pilih file CSV terlebih dahulu.');
+    alert('Pilih file CSV terlebih dahulu.');
     return;
   }
 
@@ -11,46 +9,43 @@ document.getElementById('loadBtn').addEventListener('click', function () {
   reader.onload = function (e) {
     const text = e.target.result;
     const rows = text.trim().split(/\r?\n/).map(r => r.split(/[,;\t]+/));
-    
-    // Validasi header (harus ada "Well" di kolom pertama)
+
+    // Pastikan format benar
     if (!rows[0][0].toLowerCase().includes('well')) {
-      alert('File tidak sesuai format microplate (kolom pertama harus berisi "Well").');
+      alert('Format CSV tidak valid (kolom pertama harus berisi "Well").');
       return;
     }
 
-    // Ambil header
-    const headers = rows[0];
-    const dataRows = rows.slice(1);
+    const headers = rows[0].slice(1, 13); // 1–12
+    const dataRows = rows.slice(1, 9); // A–H
 
-    // Render tabel
-    const table = document.getElementById('dataTable');
-    table.innerHTML = '';
+    const plate = document.getElementById('plateContainer');
+    plate.innerHTML = '';
 
-    // Buat header tabel
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    headers.forEach(h => {
-      const th = document.createElement('th');
-      th.textContent = h.trim();
-      headerRow.appendChild(th);
+    // Tambahkan baris label atas (1–12)
+    plate.appendChild(document.createElement('div')); // kotak kosong di kiri atas
+    headers.forEach(num => {
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.textContent = num.trim();
+      plate.appendChild(div);
     });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
 
-    // Buat body tabel
-    const tbody = document.createElement('tbody');
+    // Tambahkan isi plate
     dataRows.forEach(row => {
-      if (row.length > 1 && row[0].trim() !== '') {
-        const tr = document.createElement('tr');
-        row.forEach(cell => {
-          const td = document.createElement('td');
-          td.textContent = cell.trim();
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      }
+      const rowLabel = row[0].trim();
+      const divLabel = document.createElement('div');
+      divLabel.className = 'label';
+      divLabel.textContent = rowLabel;
+      plate.appendChild(divLabel);
+
+      row.slice(1, 13).forEach(value => {
+        const div = document.createElement('div');
+        div.className = 'well value';
+        div.textContent = value.trim();
+        plate.appendChild(div);
+      });
     });
-    table.appendChild(tbody);
   };
 
   reader.readAsText(file);
