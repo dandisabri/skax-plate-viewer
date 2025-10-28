@@ -1,28 +1,41 @@
 body {
   font-family: Arial, sans-serif;
-  background: #0f111a;
-  color: #ddd;
   text-align: center;
+  padding: 20px;
 }
 
-.upload-section {
-  margin: 20px;
+#plateContainer {
+  display: grid;
+  grid-template-columns: 40px repeat(12, 60px);
+  gap: 6px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
-table {
-  border-collapse: collapse;
-  margin: 20px auto;
-  background-color: #1c1f2b;
-  border: 1px solid #444;
+.well {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 13px;
+  border: 2px solid #bbb;
 }
 
-th, td {
-  border: 1px solid #444;
-  padding: 6px 10px;
-  text-align: center;
-  min-width: 50px;
+.label {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
 }
 
-th {
-  background-color: #222;
+.value {
+  background: #f5f5f5;
+  transition: background 0.3s;
+}
+
+.value:hover {
+  background: #d0ebff;
 }
