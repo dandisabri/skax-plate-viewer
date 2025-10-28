@@ -4,40 +4,88 @@
   <meta charset="UTF-8">
   <title>SKAX Plate Viewer</title>
   <style>
-    body { font-family: Arial; text-align: center; padding: 20px; }
-    table { margin: auto; border-collapse: collapse; }
-    td, th { border: 1px solid #ccc; padding: 5px 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f8f9fa;
+      padding: 30px;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 20px auto;
+      background: white;
+    }
+    td, th {
+      border: 1px solid #ccc;
+      padding: 6px 10px;
+      text-align: center;
+      font-size: 14px;
+    }
+    th {
+      background: #007bff;
+      color: white;
+    }
+    input, button {
+      margin: 10px;
+      padding: 8px 14px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
-  <h2>SKAX Plate Viewer</h2>
+  <h2>SKAX Plate Viewer (96-well)</h2>
   <input type="file" id="fileInput" accept=".csv,.txt">
   <button id="loadBtn">Load</button>
-  <div id="output"></div>
+
+  <div id="tableContainer"></div>
 
   <script>
     const fileInput = document.getElementById('fileInput');
-    const output = document.getElementById('output');
+    const container = document.getElementById('tableContainer');
 
     document.getElementById('loadBtn').addEventListener('click', () => {
       const file = fileInput.files[0];
-      if (!file) return alert('Please select a file first.');
+      if (!file) return alert('Please select a CSV file first.');
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        const text = e.target.result;
-        // Deteksi pemisah otomatis: koma atau titik koma
-        const delimiter = text.includes(';') ? ';' : ',';
-        const rows = text.split(/\r?\n/).filter(r => r.trim() !== '').map(r => r.split(delimiter));
+        let text = e.target.result;
 
-        let html = '<table>';
-        rows.forEach(r => {
-          html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>';
-        });
-        html += '</table>';
+        // Bersihkan karakter aneh dari hasil ekspor .skax
+        text = text.replace(/[^\x20-\x7E\n\r.,;0-9A-Za-z]/g, "");
 
-        output.innerHTML = html;
+        // Deteksi pemisah otomatis (koma, titik koma, atau tab)
+        let delimiter = ',';
+        if (text.includes(';')) delimiter = ';';
+        else if (text.includes('\t')) delimiter = '\t';
+
+        const lines = text.trim().split(/\r?\n/);
+        const data = lines.map(line => line.split(delimiter).map(v => v.trim()));
+
+        // Cari area data plate (biasanya dimulai dengan huruf A–H)
+        const startIndex = data.findIndex(row => /^[A-H]/.test(row[0] || ''));
+        if (startIndex === -1) return alert('Plate data not detected.');
+
+        const plateData = data.slice(startIndex, startIndex + 8);
+
+        // Buat tabel
+        let html = "<table><tr><th></th>";
+        for (let i = 1; i <= 12; i++) html += `<th>${i}</th>`;
+        html += "</tr>";
+
+        for (const row of plateData) {
+          html += `<tr><th>${row[0]}</th>`;
+          for (let i = 1; i <= 12; i++) {
+            const val = row[i] || "";
+            html += `<td>${val}</td>`;
+          }
+          html += "</tr>";
+        }
+        html += "</table>";
+
+        container.innerHTML = html;
       };
+
       reader.readAsText(file);
     });
   </script>
