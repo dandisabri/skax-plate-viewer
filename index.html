@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Plate Reader Viewer - .skax / Measurements</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; color:#222 }
+    header { text-align: center; margin-bottom: 12px; }
+    .controls { text-align:center; margin-bottom:14px; }
+    .meta { text-align:center; margin-bottom: 8px; color:#555 }
+    .plate-wrapper { display:flex; justify-content:center; margin-top:10px; }
+    table.plate { border-collapse: collapse; border:2px solid #333; }
+    table.plate caption { font-weight:700; margin-bottom:8px; text-align:left; padding:8px; }
+    table.plate th, table.plate td {
+      border:1px solid #888; width:72px; height:48px; text-align:center; vertical-align:middle;
+      padding:4px; font-size:13px;
+    }
+    table.plate td.value { font-weight:600; }
+    .small { font-size:12px; color:#444 }
+    .log { max-width:900px; margin: 8px auto; color:#333; background:#f9f9f9; padding:8px; border-radius:6px; border:1px solid #eee }
+    .hint { color:#666; font-size:13px; text-align:center; margin-top:8px }
+    input[type=file] { display:inline-block; }
+    .download-links { text-align:center; margin-top:10px; }
+    .highlight { background:#fffbdd; }
+    @media (max-width:880px){
+      table.plate th, table.plate td { width:52px; height:40px; font-size:12px }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 Plate Reader Viewer</h1>
+    <div class="meta">Tampilkan data absorbance (Plate 1) — Upload file CSV hasil konversi .skax</div>
+  </header>
+
+  <div class="controls">
+    <input id="fileInput" type="file" accept=".csv,.txt,.data,.xlsx" />
+    <button id="exampleBtn">Load Contoh CSV</button>
+  </div>
+
+  <div id="info" class="hint">Format yang didukung: CSV tanpa header (baris per data) atau CSV yang mengandung kolom indeks/baris & kolom. Script berusaha mendeteksi kolom absorbance otomatis.</div>
+
+  <div id="plateContainer" class="plate-wrapper"></div>
+
+  <div id="log" class="log" style="display:none"></div>
+
+  <script>
+  // Utility: parse CSV text into array of arrays
+  function parseCSV(text){
+    const rows = text.replace(/\r/g,'').split('\n').map(r=>r.trim()).filter(r=>r.length>0);
+    return rows.map(r => {
+      // split on commas but keep it simple (assume no commas inside values)
+      return r.split(',').map(c => c.trim());
+    });
+  }
+
+  // Detect the column that likely contains absorbance values (floats between 0 and 2)
+  function detectAbsorbanceColumn(data){
+    if(data.length===0) return -1;
+    const cols = data[0].length;
+    let bestCol = -1, bestScore = -1;
+    for(let c=0;c<cols;c++){
+      let countFloat=0, countVals=0, sum=0;
+      for(let r=0;r<data.length;r++){
+        const v = data[r][c];
+        if(v==='') continue;
+        countVals++;
+        const num = Number(v);
+        if(!Number.isNaN(num) && isFinite(num)){
+          // consider floats in a plausible range for absorbance: 0 - 5 (or 0 - 2)
+          if(num>=0 && num<=5) countFloat++;
+          sum += Math.abs(num);
+        }
+      }
+      // ratio of plausible numeric values
+      const score = (countVals===0)?0:(countFloat / countVals);
+      if(score > bestScore){
+        bestScore = score;
+        bestCol = c;
+      }
+    }
+    // require some confidence
+    return (bestScore>0.4) ? bestCol : -1;
+  }
+
+  // Try to detect row & column index columns (0..11 or 1..12)
+  function detectRowColColumns(data){
+    // look for two columns where values are small integers (0..11 or 1..12)
+    const cols = data[0].length;
+    for(let rcol=0;rcol<cols;rcol++){
+      for(let ccol=0;ccol<cols;ccol++){
+        if(ccol===rcol) continue;
+        let ok=true;
+        for(let r=0;r<Math.min(50,data.length);r++){
+          const a = Number(data[r][rcol]), b = Number(data[r][ccol]);
+          if(Number.isNaN(a) || Number.isNaN(b)) { ok=false; break; }
+          // allow 0..11 or 1..12
+          if(!((a>=0 && a<=11) || (a>=1 && a<=12)) || !((b>=0 && b<=11) || (b>=1 && b<=12))){ ok=false; break; }
+        }
+        if(ok) return {rowIdx:rcol, colIdx:ccol};
+      }
+    }
+    return null;
+  }
+
+  // Create plate table (A-H rows, 1-12 cols)
+  function createPlateTable(valuesGrid){
+    // valuesGrid should be array 8 rows × 12 cols (may contain null or '')
+    const container = document.getElementById('plateContainer');
+    container.innerHTML = '';
+    const table = document.createElement('table');
+    table.className = 'plate';
+    const caption = document.createElement('caption');
+    caption.textContent = 'Plate 1 — Absorbance';
+    table.appendChild(caption);
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    headRow.appendChild(document.createElement('th')); // corner empty
+    for(let c=1;c<=12;c++){
+      const th = document.createElement('th');
+      th.textContent = c;
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const rowLabels = ['A','B','C','D','E','F','G','H'];
+    for(let r=0;r<8;r++){
+      const tr = document.createElement('tr');
+      const th = document.createElement('th');
+      th.textContent = rowLabels[r];
+      tr.appendChild(th);
+      for(let c=0;c<12;c++){
+        const td = document.createElement('td');
+        const val = (valuesGrid && valuesGrid[r] && typeof valuesGrid[r][c] !== 'undefined') ? valuesGrid[r][c] : '';
+        td.className = 'value';
+        td.textContent = (val === null || val === '') ? '' : Number(val).toFixed(4);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  // Fill values into 8x12 grid when data rows may contain row/col indices and absorbance col
+  function buildGridFromIndexedRows(data, rowColInfo, absorbCol){
+    const grid = Array.from({length:8}, ()=>Array(12).fill(''));
+    const rowIdx = rowColInfo.rowIdx, colIdx = rowColInfo.colIdx;
+    for(let r=0;r<data.length;r++){
+      const rr = Number(data[r][rowIdx]);
+      const cc = Number(data[r][colIdx]);
+      const rawVal = data[r][absorbCol];
+      const val = rawVal === '' ? '' : Number(rawVal);
+      // convert if indexes 1..12 -> 1..12 and 0..11
+      let rowNumber = rr;
+      let colNumber = cc;
+      if(rr>=1 && rr<=12 && cc>=0 && cc<=11 && rr<=8) {
+        // possible swapped; handle below
+      }
+      // Try common patterns:
+      // pattern A: row index 0..7 or 1..8, col index 0..11 or 1..12
+      if(rr>=0 && rr<=7 && (cc>=1 && cc<=12)){ rowNumber = rr; colNumber = cc-1; }
+      else if(rr>=1 && rr<=8 && cc>=1 && cc<=12){ rowNumber = rr-1; colNumber = cc-1; }
+      else if(rr>=1 && rr<=12 && cc>=1 && cc<=8){ // maybe swapped: col first
+        rowNumber = cc-1; colNumber = rr-1;
+      } else if(rr>=0 && rr<=11 && cc>=0 && cc<=11 && rr<8){ rowNumber = rr; colNumber = cc; }
+      // final validate
+      if(Number.isInteger(rowNumber) && Number.isInteger(colNumber) && rowNumber>=0 && rowNumber<8 && colNumber>=0 && colNumber<12){
+        grid[rowNumber][colNumber] = val;
+      }
+    }
+    return grid;
+  }
+
+  // Build grid if input is simple list of absorbance values (96 rows)
+  function buildGridFromSequentialAbsorbances(values){
+    const grid = Array.from({length:8}, ()=>Array(12).fill(''));
+    // assume values is array of numbers length >= 96; fill row-major A1..A12, B1..B12, ...
+    const needed = 96;
+    if(values.length < needed) return null;
+    let idx=0;
+    for(let r=0;r<8;r++){
+      for(let c=0;c<12;c++){
+        const v = Number(values[idx]);
+        grid[r][c] = Number.isNaN(v) ? '' : v;
+        idx++;
+      }
+    }
+    return grid;
+  }
+
+  // Main processing
+  function processCSVText(text){
+    const data = parseCSV(text);
+    const logEl = document.getElementById('log'); logEl.style.display='block'; logEl.innerText = 'Parsing CSV...';
+
+    // detect absorbance column
+    const absCol = detectAbsorbanceColumn(data);
+    const rowCol = detectRowColColumns(data);
+
+    logEl.innerText += `\nRows: ${data.length}, Cols per row (first row): ${data[0].length}`;
+    if(rowCol) logEl.innerText += `\nDetected index columns -> rowCol: ${rowCol.rowIdx}, colCol: ${rowCol.colIdx}`;
+    if(absCol>=0) logEl.innerText += `\nDetected absorbance column: ${absCol}`;
+    else logEl.innerText += `\nAbsorbance column NOT confidently detected. Will try fallback detection.`;
+
+    let grid = null;
+    if(rowCol && absCol>=0){
+      grid = buildGridFromIndexedRows(data, rowCol, absCol);
+    } else {
+      // Fallback: check if each row has an obvious abs value in a specific column (e.g., column 8)
+      // Or if there are exactly 96 rows with first numeric column being absorbance
+      // Try: find a column with many decimals and small magnitude (0..5)
+      let fallbackCol = absCol;
+      if(fallbackCol < 0) {
+        // pick the column with most numeric entries in plausible range
+        fallbackCol = (absCol >=0) ? absCol : 0;
+      }
+      // If we have at least 96 rows, build sequentially from the detected col or from first numeric col
+      if(data.length >= 96){
+        // pick an array of absorbance values using fallbackCol
+        let arr = data.map(r => {
+          // try to pick the best numeric in row: choose the first numeric value in range 0..5
+          for(let j=0;j<r.length;j++){
+            const n = Number(r[j]);
+            if(!Number.isNaN(n) && isFinite(n) && n>=0 && n<=5) return n;
+          }
+          return '';
+        });
+        const tryGrid = buildGridFromSequentialAbsorbances(arr);
+        if(tryGrid) grid = tryGrid;
+      }
+    }
+
+    if(!grid){
+      logEl.innerText += '\nGagal membangun grid otomatis. Coba upload CSV dengan 96 baris (setiap baris satu nilai) atau CSV yang berisi kolom indeks baris & kolom (0..7 / 1..8 untuk baris & 1..12 untuk kolom).';
+      createPlateTable(null);
+      return;
+    }
+    logEl.innerText += '\nSukses membangun grid. Menampilkan table...';
+    createPlateTable(grid);
+  }
+
+  // File input handling
+  document.getElementById('fileInput').addEventListener('change', (ev)=>{
+    const f = ev.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      processCSVText(String(e.target.result));
+    };
+    reader.readAsText(f);
+  });
+
+  // Example CSV quick load (small demo)
+  document.getElementById('exampleBtn').addEventListener('click', ()=>{
+    // contoh sederhana: 8x12 sequential values
+    const values = [];
+    for(let r=0;r<8;r++){
+      for(let c=0;c<12;c++){
+        // generate demo value ~0.05..0.11
+        const v = (0.046 + (Math.random()*0.06)).toFixed(4);
+        values.push(v);
+      }
+    }
+    const csv = values.join('\n');
+    processCSVText(csv);
+  });
+
+  // Initialize with blank plate
+  createPlateTable(Array.from({length:8}, ()=>Array(12).fill('')));
+  </script>
+</body>
+</html>
